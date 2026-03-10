@@ -12,7 +12,6 @@ import {
   FileText,
   AlertCircle,
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 
 // 🎭 ICON REGISTRY
 // Zentrale Icon-Verwaltung mit semantischen Namen

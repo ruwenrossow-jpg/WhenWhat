@@ -60,8 +60,8 @@ export default function WeekViewPage() {
         } else {
           setError("Events konnten nicht geladen werden");
         }
-      } catch (error: any) {
-        if (error.name !== 'AbortError') {
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name !== 'AbortError') {
           console.error("Error fetching events:", error);
           setError("Fehler beim Laden der Events. Bitte erneut versuchen.");
         }

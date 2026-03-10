@@ -1,5 +1,4 @@
 import { brandTokens } from './tokens';
-import type { Config } from 'tailwindcss';
 
 // Konvertiert Design-Tokens in Tailwind-Theme-Format
 export const customTheme = {
