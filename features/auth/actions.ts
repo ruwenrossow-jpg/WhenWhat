@@ -54,13 +54,13 @@ export async function signup(_prevState: unknown, formData: FormData): Promise<A
   return { success: true };
 }
 
-export async function logout() {
+export async function logout(): Promise<void> {
   const supabase = await createClient();
 
   const { error } = await supabase.auth.signOut();
 
   if (error) {
-    return { error: error.message };
+    console.error("Logout error:", error.message);
   }
 
   revalidatePath("/", "layout");
