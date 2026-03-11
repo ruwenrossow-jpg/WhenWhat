@@ -6,9 +6,17 @@ export async function updateSession(request: NextRequest) {
     request,
   });
 
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !key) {
+    console.error("Missing Supabase environment variables");
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    key,
     {
       cookies: {
         getAll() {
@@ -36,6 +44,16 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // Handle root path - let client-side splash handle for non-authenticated users
+  if (request.nextUrl.pathname === "/") {
+    if (user) {
+      // Authenticated users go directly to day view
+      return NextResponse.redirect(new URL("/day", request.url));
+    }
+    // For non-authenticated users, allow root splash to load
+    return supabaseResponse;
+  }
 
   // Protected routes
   if (!user && request.nextUrl.pathname.startsWith("/day")) {

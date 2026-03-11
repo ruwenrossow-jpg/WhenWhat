@@ -54,6 +54,14 @@ export default function DayViewPage() {
           `/api/events/day?date=${formatDateForURL(currentDate)}`,
           { signal: abortController.signal }
         );
+        
+        // Check for authentication errors
+        if (response.status === 401 || response.status === 403) {
+          console.error("Authentication failed, redirecting to login");
+          router.push("/login");
+          return;
+        }
+        
         if (response.ok) {
           const data = await response.json();
           setEvents(data);
@@ -75,7 +83,7 @@ export default function DayViewPage() {
     fetchEvents();
     
     return () => abortController.abort();
-  }, [currentDate, refreshKey]);
+  }, [currentDate, refreshKey, router]);
 
   const handlePrevious = () => setCurrentDate(getPreviousDay(currentDate));
   const handleNext = () => setCurrentDate(getNextDay(currentDate));

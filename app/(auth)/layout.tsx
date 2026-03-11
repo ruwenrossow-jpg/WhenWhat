@@ -8,7 +8,7 @@ export default function AuthLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [showSplash, setShowSplash] = useState(false);
+  const [showSplash, setShowSplash] = useState<boolean | null>(null);
 
   useEffect(() => {
     // Check if user has seen splash this session
@@ -24,8 +24,15 @@ export default function AuthLayout({
       }, 2500);
 
       return () => clearTimeout(timer);
+    } else {
+      setShowSplash(false);
     }
   }, []);
+
+  // Don't render anything until we've checked sessionStorage
+  if (showSplash === null) {
+    return null;
+  }
 
   // Show splash screen if not seen yet
   if (showSplash) {
