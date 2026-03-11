@@ -4,12 +4,17 @@ import { z } from "zod";
 const datetimeLocalToISO = (value: string) => {
   // datetime-local format: "2024-03-10T14:30"
   // We need to convert to full ISO: "2024-03-10T14:30:00.000Z"
-  if (!value) return value;
-  try {
-    return new Date(value).toISOString();
-  } catch {
-    return value;
+  if (!value) {
+    throw new Error("DateTime-Wert ist erforderlich");
   }
+  
+  const date = new Date(value);
+  
+  if (isNaN(date.getTime())) {
+    throw new Error("Ung\u00fcltiges DateTime-Format");
+  }
+  
+  return date.toISOString();
 };
 
 export const eventSchema = z.object({

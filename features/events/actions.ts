@@ -12,6 +12,8 @@ export type EventActionState = {
 export async function createEvent(_prevState: unknown, formData: FormData): Promise<EventActionState> {
   const supabase = await createClient();
 
+  console.log("[createEvent] Starting event creation...");
+
   // Safe FormData extraction with null checks
   const data = {
     title: formData.get("title")?.toString() ?? "",
@@ -21,29 +23,54 @@ export async function createEvent(_prevState: unknown, formData: FormData): Prom
     color: formData.get("color")?.toString() ?? "primary",
   };
 
+  console.log("[createEvent] Form data:", data);
+
   const validation = createEventSchema.safeParse(data);
 
   if (!validation.success) {
+    console.error("[createEvent] Validation error:", validation.error.issues);
     return { error: validation.error.issues[0].message };
   }
+
+  console.log("[createEvent] Validation successful:", validation.data);
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
+    console.error("[createEvent] User not authenticated");
     return { error: "Nicht authentifiziert" };
   }
 
-  const { error } = await supabase.from("events").insert({
+  console.log("[createEvent] User authenticated:", user.id);
+
+  const insertData = {
     user_id: user.id,
     ...validation.data,
-  });
+  };
+
+  console.log("[createEvent] Inserting into database:", insertData);
+
+  const { error } = await supabase.from("events").insert(insertData);
 
   if (error) {
-    console.error("[createEvent] Database error:", error);
+    console.error("[createEvent] Database error:", {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
+    
+    // In development, show detailed error
+    if (process.env.NODE_ENV === 'development') {
+      return { error: `Datenbank-Fehler: ${error.message} (Code: ${error.code})` };
+    }
+    
     return { error: "Event konnte nicht gespeichert werden. Bitte versuche es erneut." };
   }
+
+  console.log("[createEvent] Event successfully created");
 
   revalidatePath("/day");
   revalidatePath("/week");
