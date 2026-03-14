@@ -33,9 +33,9 @@ export const calendarConstants = {
   // Layout
   layout: {
     navHeight: '4rem',           // 64px
-    fabBottomMobile: '5rem',     // 80px (bottom-20)
+    fabBottomMobile: 'max(1.25rem, calc(env(safe-area-inset-bottom) + 5rem))', // Über Mobile-Nav + iOS Home Indicator
     fabBottomDesktop: '1.5rem',  // 24px (bottom-6)
-    fabRight: '1.5rem',          // 24px (right-6)
+    fabRight: 'max(1rem, calc(env(safe-area-inset-right) + 1rem))', // Safe-Area rechts berücksichtigen
     contentMaxHeight: 'calc(100vh - 16rem)', // Scroll-Container-Höhe
   },
 } as const;

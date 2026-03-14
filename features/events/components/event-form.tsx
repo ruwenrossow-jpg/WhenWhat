@@ -4,10 +4,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ColorPicker } from "@/components/ui/color-picker";
-import { createEvent, updateEvent, type EventActionState } from "../actions";
+import { createEvent, updateEvent } from "../actions";
 import { useActionState, useEffect, useState } from "react";
 import type { Event } from "../queries";
 import type { EventColorId } from "@/lib/design/tokens";
+
+const WEEKDAYS = [
+  { value: 1, label: "Mo" },
+  { value: 2, label: "Di" },
+  { value: 3, label: "Mi" },
+  { value: 4, label: "Do" },
+  { value: 5, label: "Fr" },
+  { value: 6, label: "Sa" },
+  { value: 7, label: "So" },
+];
 
 type EventFormProps = {
   mode: "create" | "edit";
@@ -20,6 +30,12 @@ export function EventForm({ mode, event, onSuccess }: EventFormProps) {
   const [state, formAction, isPending] = useActionState(action, undefined);
   const [selectedColor, setSelectedColor] = useState<EventColorId>(
     (event?.color as EventColorId) ?? 'primary'
+  );
+  const [recurrenceType, setRecurrenceType] = useState<"none" | "daily" | "weekly" | "monthly">(
+    event?.is_recurring && event.recurrence_type ? event.recurrence_type : "none"
+  );
+  const [editScope, setEditScope] = useState<"single" | "series">(
+    event?.is_recurring_instance ? "single" : "series"
   );
 
   useEffect(() => {
@@ -58,7 +74,16 @@ export function EventForm({ mode, event, onSuccess }: EventFormProps) {
   return (
     <form action={formAction} className="space-y-4">
       {mode === "edit" && event && (
-        <input type="hidden" name="id" value={event.id} />
+        <>
+          <input type="hidden" name="id" value={event.source_event_id ?? event.id} />
+          {event.source_event_id && (
+            <input type="hidden" name="source_event_id" value={event.source_event_id} />
+          )}
+          {event.occurrence_date && (
+            <input type="hidden" name="occurrence_date" value={event.occurrence_date} />
+          )}
+          <input type="hidden" name="edit_scope" value={editScope} />
+        </>
       )}
 
       <div className="space-y-2">
@@ -123,6 +148,91 @@ export function EventForm({ mode, event, onSuccess }: EventFormProps) {
         </div>
       </div>
 
+      <div className="space-y-2">
+        <Label htmlFor="recurrence_type">Wiederholung</Label>
+        <select
+          id="recurrence_type"
+          name="recurrence_type"
+          value={recurrenceType}
+          onChange={(e) => setRecurrenceType(e.target.value as "none" | "daily" | "weekly" | "monthly")}
+          disabled={isPending}
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+        >
+          <option value="none">Keine Wiederholung</option>
+          <option value="daily">Täglich</option>
+          <option value="weekly">Wöchentlich</option>
+          <option value="monthly">Monatlich</option>
+        </select>
+      </div>
+
+      {recurrenceType !== "none" && (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="recurrence_interval">Intervall</Label>
+              <Input
+                id="recurrence_interval"
+                name="recurrence_interval"
+                type="number"
+                min={1}
+                max={12}
+                defaultValue={event?.recurrence_interval ?? 1}
+                disabled={isPending}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="recurrence_until">Serienende</Label>
+              <Input
+                id="recurrence_until"
+                name="recurrence_until"
+                type="date"
+                defaultValue={event?.recurrence_until ?? ""}
+                disabled={isPending}
+              />
+            </div>
+          </div>
+
+          {recurrenceType === "weekly" && (
+            <div className="space-y-2">
+              <Label>Wochentage</Label>
+              <div className="flex flex-wrap gap-2">
+                {WEEKDAYS.map((day) => {
+                  const checked = (event?.recurrence_days ?? []).includes(day.value);
+                  return (
+                    <label key={day.value} className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs">
+                      <input
+                        type="checkbox"
+                        name="recurrence_days"
+                        value={day.value}
+                        defaultChecked={checked}
+                        disabled={isPending}
+                      />
+                      {day.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {mode === "edit" && event?.is_recurring_instance && (
+        <div className="space-y-2">
+          <Label htmlFor="edit_scope">Änderung anwenden auf</Label>
+          <select
+            id="edit_scope"
+            value={editScope}
+            onChange={(e) => setEditScope(e.target.value as "single" | "series")}
+            disabled={isPending}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          >
+            <option value="single">Nur diesen Termin</option>
+            <option value="series">Gesamte Serie</option>
+          </select>
+        </div>
+      )}
+
       {state?.error && (
         <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
           {state.error}
@@ -130,7 +240,19 @@ export function EventForm({ mode, event, onSuccess }: EventFormProps) {
       )}
 
       <div className="flex gap-2 justify-end">
-        <Button type="submit" disabled={isPending} className="w-full sm:w-auto">
+        {mode === "edit" && (
+          <Button
+            type="submit"
+            name="_intent"
+            value="delete"
+            variant="destructive"
+            disabled={isPending}
+            className="w-full sm:w-auto"
+          >
+            {isPending ? "Löschen..." : "Löschen"}
+          </Button>
+        )}
+        <Button type="submit" name="_intent" value="save" disabled={isPending} className="w-full sm:w-auto">
           {isPending
             ? mode === "create"
               ? "Erstellen..."

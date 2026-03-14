@@ -3,7 +3,7 @@
 import type { Event } from "@/features/events/queries";
 import { calculateEventPosition, formatTime } from "../utils";
 import { Clock } from "lucide-react";
-import { useEffect, useRef, useState, useMemo, memo } from "react";
+import { useEffect, useState, useMemo, memo } from "react";
 import { useTimelineHeight } from "@/lib/design/hooks";
 import { calendarConstants } from "@/lib/design/constants";
 import { brandTokens } from "@/lib/design/tokens";
@@ -20,29 +20,10 @@ type DayTimelineProps = {
 
 export function DayTimeline({ events, onEventEdit }: DayTimelineProps) {
   const hours = useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
-  const containerRef = useRef<HTMLDivElement>(null);
   const hourHeight = useTimelineHeight();
 
-  // Auto-scroll to current time (minus offset for context)
-  useEffect(() => {
-    if (containerRef.current) {
-      const now = new Date();
-      const currentHour = now.getHours() + now.getMinutes() / 60;
-      const scrollToHour = Math.max(0, currentHour - calendarConstants.timeline.autoScrollOffset);
-      const scrollPosition = scrollToHour * hourHeight;
-      
-      containerRef.current.scrollTo({
-        top: scrollPosition,
-        behavior: "smooth",
-      });
-    }
-  }, [hourHeight]);
-
   return (
-    <div 
-      ref={containerRef}
-      className="relative bg-card rounded-lg border overflow-auto max-h-[calc(100vh-16rem)]"
-    >
+    <div className="relative bg-card rounded-lg border overflow-visible">
       {/* Timeline Grid */}
       <div className="relative" style={{ height: `${24 * hourHeight}px` }}>
         {/* Hour markers */}

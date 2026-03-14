@@ -1,0 +1,11 @@
+{
+  "name": "WhenWhat",
+  "short_name": "WhenWhat",
+  "description": "Mobiler Solo-Kalender fuer deine Events",
+  "start_url": "/day",
+  "display": "standalone",
+  "background_color": "#F7FBFC",
+  "theme_color": "#0D5C7D",
+  "orientation": "portrait",
+  "lang": "de"
+}

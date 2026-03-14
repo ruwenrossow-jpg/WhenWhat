@@ -9,7 +9,7 @@ type DateNavigationProps = {
   onDateChange: (date: Date) => void;
   onPrevious: () => void;
   onNext: () => void;
-  mode: "day" | "week";
+  mode: "day" | "week" | "month";
 };
 
 export function DateNavigation({

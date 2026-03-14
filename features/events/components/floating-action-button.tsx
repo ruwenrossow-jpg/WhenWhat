@@ -14,9 +14,10 @@ export function FloatingActionButton({ onClick }: FloatingActionButtonProps) {
     <Button
       size="lg"
       onClick={onClick}
-      className="fixed right-6 rounded-full shadow-lg sm:bottom-6"
+      className="fixed rounded-full shadow-lg z-30 sm:bottom-6"
       style={{ 
         bottom: calendarConstants.layout.fabBottomMobile,
+        right: calendarConstants.layout.fabRight,
         width: brandTokens.sizes.fab.width,
         height: brandTokens.sizes.fab.height,
       }}

@@ -75,11 +75,23 @@
 }
 
 @layer base {
+  html,
+  body,
+  #__next {
+    height: 100%;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
+    overscroll-behavior: none;
   }
 }
 
@@ -93,6 +105,28 @@ body {
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  .safe-px {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+
+  .safe-pt {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-pb {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-pb-nav {
+    padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
+  }
+
+  .mobile-single-scroll {
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
   }
   
   /* 🎨 Custom Utility-Klassen für Current-Time-Indicator */

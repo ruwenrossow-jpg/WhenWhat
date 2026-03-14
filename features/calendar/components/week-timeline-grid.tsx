@@ -37,7 +37,7 @@ export function WeekTimelineGrid({ currentDate, events, onEventClick }: WeekTime
   }, [weekDays, events]);
 
   return (
-    <div className="bg-card rounded-lg border overflow-auto" style={{ maxHeight: calendarConstants.layout.contentMaxHeight }}>
+    <div className="bg-card rounded-lg border overflow-x-auto overflow-y-visible">
       <div className="flex" style={{ minWidth: calendarConstants.weekGrid.minWidth.timeline }}>
         {/* Time column - sticky */}
         <div className="sticky left-0 bg-card z-20 border-r flex-shrink-0" style={{ width: calendarConstants.timeline.timeColumnWidth }}>

@@ -1,10 +1,14 @@
 import {
   startOfWeek,
   endOfWeek,
+  startOfMonth,
+  endOfMonth,
   addDays,
   addWeeks,
+  addMonths,
   subDays,
   subWeeks,
+  subMonths,
   format,
   startOfDay,
   endOfDay,
@@ -30,10 +34,12 @@ export function getEndOfWeek(date: Date): Date {
 /**
  * Format date for display
  */
-export function formatDateHeader(date: Date, mode: "day" | "week"): string {
+export function formatDateHeader(date: Date, mode: "day" | "week" | "month"): string {
   if (mode === "day") {
     return format(date, "EEEE, d. MMMM yyyy", { locale: de });
-  } else {
+  }
+
+  if (mode === "week") {
     const start = getStartOfWeek(date);
     const end = getEndOfWeek(date);
     return `${format(start, "d. MMM", { locale: de })} - ${format(
@@ -42,6 +48,8 @@ export function formatDateHeader(date: Date, mode: "day" | "week"): string {
       { locale: de }
     )}`;
   }
+
+  return format(date, "MMMM yyyy", { locale: de });
 }
 
 /**
@@ -113,6 +121,40 @@ export function getPreviousWeek(date: Date): Date {
  */
 export function getNextWeek(date: Date): Date {
   return addWeeks(date, 1);
+}
+
+/**
+ * Navigate to previous month
+ */
+export function getPreviousMonth(date: Date): Date {
+  return subMonths(date, 1);
+}
+
+/**
+ * Navigate to next month
+ */
+export function getNextMonth(date: Date): Date {
+  return addMonths(date, 1);
+}
+
+/**
+ * Get all days needed to render a complete month grid (Monday-first, 6 rows)
+ */
+export function getMonthGridDays(date: Date): Date[] {
+  const monthStart = startOfMonth(date);
+  const monthEnd = endOfMonth(date);
+  const gridStart = getStartOfWeek(monthStart);
+  const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 1, locale: de });
+
+  const days: Date[] = [];
+  let current = gridStart;
+
+  while (current <= gridEnd) {
+    days.push(current);
+    current = addDays(current, 1);
+  }
+
+  return days;
 }
 
 /**
