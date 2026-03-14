@@ -7,7 +7,16 @@ import { EventDialog } from "@/features/events/components/event-dialog";
 import { FloatingActionButton } from "@/features/events/components/floating-action-button";
 import { DateNavigation } from "@/features/calendar/components/date-navigation";
 import { DayTimeline } from "@/features/calendar/components/day-timeline";
+import { TimelineZoomControls } from "@/features/calendar/components/timeline-zoom-controls";
+import { DayTimelineSkeleton } from "@/features/calendar/components/loading-skeletons";
 import type { Event } from "@/features/events/queries";
+import { useTimelineViewport } from "@/lib/design/hooks";
+import {
+  fetchEventsFromApi,
+  getCachedEvents,
+  invalidateCachedEvents,
+  prefetchEvents,
+} from "@/features/events/client-cache";
 import {
   getToday,
   getPreviousDay,
@@ -30,11 +39,16 @@ export default function DayViewPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [createDraft, setCreateDraft] = useState<{ start_time?: string; end_time?: string } | undefined>();
   const [editingEvent, setEditingEvent] = useState<Event | undefined>();
   const [refreshKey, setRefreshKey] = useState(0);
+  const timelineViewport = useTimelineViewport("day");
 
   // Refresh events list
-  const refreshEvents = () => setRefreshKey((prev) => prev + 1);
+  const refreshEvents = () => {
+    invalidateCachedEvents("day", formatDateForURL(currentDate));
+    setRefreshKey((prev) => prev + 1);
+  };
 
   // Update URL when date changes
   useEffect(() => {
@@ -45,33 +59,52 @@ export default function DayViewPage() {
   // Fetch events for current day
   useEffect(() => {
     const abortController = new AbortController();
+    const dateString = formatDateForURL(currentDate);
+    const cachedEvents = getCachedEvents("day", dateString);
     
     const fetchEvents = async () => {
-      setIsLoading(true);
+      if (cachedEvents) {
+        setEvents(cachedEvents);
+        setIsLoading(false);
+      } else {
+        setIsLoading(true);
+      }
+
       setError(null);
+
       try {
-        const response = await fetch(
-          `/api/events/day?date=${formatDateForURL(currentDate)}`,
-          { signal: abortController.signal }
-        );
-        
-        // Check for authentication errors
-        if (response.status === 401 || response.status === 403) {
+        const result = await fetchEventsFromApi("day", dateString, {
+          signal: abortController.signal,
+        });
+
+        if (result.kind === "auth") {
           console.error("Authentication failed, redirecting to login");
           router.push("/login");
           return;
         }
-        
-        if (response.ok) {
-          const data = await response.json();
-          setEvents(data);
-        } else {
+
+        if (result.kind === "success") {
+          setEvents(result.events);
+
+          const previousDay = formatDateForURL(getPreviousDay(currentDate));
+          const nextDay = formatDateForURL(getNextDay(currentDate));
+          setTimeout(() => {
+            void prefetchEvents("day", previousDay);
+            void prefetchEvents("day", nextDay);
+          }, 0);
+          return;
+        }
+
+        if (!cachedEvents) {
           setError("Events konnten nicht geladen werden");
         }
       } catch (error: unknown) {
-        if (error instanceof Error && error.name !== 'AbortError') {
+        if (error instanceof Error && error.name !== "AbortError") {
           console.error("Error fetching events:", error);
-          setError("Fehler beim Laden der Events. Bitte erneut versuchen.");
+
+          if (!cachedEvents) {
+            setError("Fehler beim Laden der Events. Bitte erneut versuchen.");
+          }
         }
       } finally {
         if (!abortController.signal.aborted) {
@@ -88,9 +121,14 @@ export default function DayViewPage() {
   const handlePrevious = () => setCurrentDate(getPreviousDay(currentDate));
   const handleNext = () => setCurrentDate(getNextDay(currentDate));
 
+  const handleSlotSelect = (slot: { start_time: string; end_time: string }) => {
+    setCreateDraft(slot);
+    setIsCreateDialogOpen(true);
+  };
+
   return (
     <>
-      <div className="space-y-4">
+      <div className="space-y-4 calendar-view-transition">
         <DateNavigation
           currentDate={currentDate}
           onDateChange={setCurrentDate}
@@ -99,10 +137,16 @@ export default function DayViewPage() {
           mode="day"
         />
 
+        <TimelineZoomControls
+          label={timelineViewport.zoomPreset}
+          onZoomOut={timelineViewport.zoomOut}
+          onZoomIn={timelineViewport.zoomIn}
+          canZoomOut={timelineViewport.canZoomOut}
+          canZoomIn={timelineViewport.canZoomIn}
+        />
+
         {isLoading ? (
-          <div className="bg-card rounded-lg border p-8 text-center">
-            <p className="text-muted-foreground">Lade Events...</p>
-          </div>
+          <DayTimelineSkeleton />
         ) : error ? (
           <div className="bg-destructive/10 border border-destructive rounded-lg p-6 space-y-3">
             <div className="flex items-start gap-3">
@@ -126,8 +170,12 @@ export default function DayViewPage() {
         ) : (
           <>
             <DayTimeline
+              currentDate={currentDate}
               events={events}
               onEventEdit={setEditingEvent}
+              onSlotSelect={handleSlotSelect}
+              hourHeight={timelineViewport.hourHeight}
+              autoFocusOnNow={currentDate.toDateString() === new Date().toDateString()}
             />
             {events.length === 0 && (
               <div className="mt-4 text-center p-6 bg-muted/30 rounded-lg border border-dashed">
@@ -144,13 +192,24 @@ export default function DayViewPage() {
         )}
       </div>
 
-      <FloatingActionButton onClick={() => setIsCreateDialogOpen(true)} />
+      <FloatingActionButton
+        onClick={() => {
+          setCreateDraft(undefined);
+          setIsCreateDialogOpen(true);
+        }}
+      />
 
       <EventDialog
         open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
+        onOpenChange={(open) => {
+          setIsCreateDialogOpen(open);
+          if (!open) {
+            setCreateDraft(undefined);
+          }
+        }}
         onSuccess={refreshEvents}
         mode="create"
+        initialValues={createDraft}
       />
 
       <EventDialog

@@ -4,7 +4,7 @@ import { LogOut, Calendar, CalendarDays, CalendarRange } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
 import { logout } from "@/features/auth/actions";
-import Link from "next/link";
+import { ActiveNavLink } from "@/features/calendar/components/active-nav-link";
 import {
   FocusModeProvider,
   FocusAwareHeader,
@@ -60,24 +60,9 @@ export default async function CalendarLayout({
           {/* Desktop Navigation */}
           <FocusAwareBlock>
             <div className="hidden sm:flex gap-2 mb-4">
-              <Button asChild variant="outline" size="sm">
-                <Link href="/day">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Tagesansicht
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/month">
-                  <CalendarRange className="h-4 w-4 mr-2" />
-                  Monatsansicht
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/week">
-                  <CalendarDays className="h-4 w-4 mr-2" />
-                  Wochenansicht
-                </Link>
-              </Button>
+              <ActiveNavLink href="/day" label="Tag" icon={<Calendar className="h-4 w-4" />} variant="desktop" />
+              <ActiveNavLink href="/week" label="Woche" icon={<CalendarDays className="h-4 w-4" />} variant="desktop" />
+              <ActiveNavLink href="/month" label="Monat" icon={<CalendarRange className="h-4 w-4" />} variant="desktop" />
             </div>
           </FocusAwareBlock>
 
@@ -87,18 +72,9 @@ export default async function CalendarLayout({
         {/* Bottom Navigation (Mobile) */}
         <FocusAwareNav>
           <div className="flex items-center justify-around h-16 safe-px">
-            <Link href="/day" className="flex flex-col items-center gap-1 px-4 py-2">
-              <Calendar className="h-5 w-5" />
-              <span className="text-xs">Tag</span>
-            </Link>
-            <Link href="/month" className="flex flex-col items-center gap-1 px-4 py-2">
-              <CalendarRange className="h-5 w-5" />
-              <span className="text-xs">Monat</span>
-            </Link>
-            <Link href="/week" className="flex flex-col items-center gap-1 px-4 py-2">
-              <CalendarDays className="h-5 w-5" />
-              <span className="text-xs">Woche</span>
-            </Link>
+            <ActiveNavLink href="/day" label="Tag" icon={<Calendar className="h-5 w-5" />} />
+            <ActiveNavLink href="/week" label="Woche" icon={<CalendarDays className="h-5 w-5" />} />
+            <ActiveNavLink href="/month" label="Monat" icon={<CalendarRange className="h-5 w-5" />} />
           </div>
         </FocusAwareNav>
       </div>

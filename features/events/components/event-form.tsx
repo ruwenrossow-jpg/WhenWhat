@@ -9,6 +9,12 @@ import { useActionState, useEffect, useState } from "react";
 import type { Event } from "../queries";
 import type { EventColorId } from "@/lib/design/tokens";
 
+const DURATION_PRESETS = [
+  { label: "+30m", minutes: 30 },
+  { label: "+1h", minutes: 60 },
+  { label: "+2h", minutes: 120 },
+];
+
 const WEEKDAYS = [
   { value: 1, label: "Mo" },
   { value: 2, label: "Di" },
@@ -23,13 +29,20 @@ type EventFormProps = {
   mode: "create" | "edit";
   event?: Event;
   onSuccess?: () => void;
+  initialValues?: {
+    title?: string;
+    description?: string;
+    start_time?: string;
+    end_time?: string;
+    color?: EventColorId;
+  };
 };
 
-export function EventForm({ mode, event, onSuccess }: EventFormProps) {
+export function EventForm({ mode, event, onSuccess, initialValues }: EventFormProps) {
   const action = mode === "create" ? createEvent : updateEvent;
   const [state, formAction, isPending] = useActionState(action, undefined);
   const [selectedColor, setSelectedColor] = useState<EventColorId>(
-    (event?.color as EventColorId) ?? 'primary'
+    (event?.color as EventColorId) ?? initialValues?.color ?? 'primary'
   );
   const [recurrenceType, setRecurrenceType] = useState<"none" | "daily" | "weekly" | "monthly">(
     event?.is_recurring && event.recurrence_type ? event.recurrence_type : "none"
@@ -44,9 +57,19 @@ export function EventForm({ mode, event, onSuccess }: EventFormProps) {
     }
   }, [state, onSuccess]);
 
+  const toLocalDateTimeValue = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
   // Format datetime-local values
   const formatDateTimeLocal = (date: string) => {
-    return new Date(date).toISOString().slice(0, 16);
+    return toLocalDateTimeValue(new Date(date));
   };
 
   // Default times for new events (now + 1 hour for start, now + 2 hours for end)
@@ -54,22 +77,67 @@ export function EventForm({ mode, event, onSuccess }: EventFormProps) {
     const now = new Date();
     now.setMinutes(0, 0, 0);
     now.setHours(now.getHours() + 1);
-    return now.toISOString().slice(0, 16);
+    return toLocalDateTimeValue(now);
   };
 
   const getDefaultEndTime = () => {
     const now = new Date();
     now.setMinutes(0, 0, 0);
     now.setHours(now.getHours() + 2);
-    return now.toISOString().slice(0, 16);
+    return toLocalDateTimeValue(now);
   };
 
   const defaultStartTime = event?.start_time
     ? formatDateTimeLocal(event.start_time)
-    : getDefaultStartTime();
+    : initialValues?.start_time ?? getDefaultStartTime();
   const defaultEndTime = event?.end_time
     ? formatDateTimeLocal(event.end_time)
-    : getDefaultEndTime();
+    : initialValues?.end_time ?? getDefaultEndTime();
+
+  const [startTimeValue, setStartTimeValue] = useState(defaultStartTime);
+  const [endTimeValue, setEndTimeValue] = useState(defaultEndTime);
+  const [isEndManuallyAdjusted, setIsEndManuallyAdjusted] = useState(mode === "edit");
+
+  useEffect(() => {
+    if (mode !== "create") {
+      return;
+    }
+
+    setStartTimeValue(defaultStartTime);
+    setEndTimeValue(defaultEndTime);
+    setSelectedColor(initialValues?.color ?? "primary");
+    setIsEndManuallyAdjusted(false);
+  }, [defaultEndTime, defaultStartTime, initialValues?.color, mode]);
+
+  const addMinutesToLocalValue = (value: string, minutes: number) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+
+    date.setMinutes(date.getMinutes() + minutes);
+    return toLocalDateTimeValue(date);
+  };
+
+  const getMinutesDifference = (startValue: string, endValue: string) => {
+    const start = new Date(startValue);
+    const end = new Date(endValue);
+    return Math.max(30, Math.round((end.getTime() - start.getTime()) / 60000));
+  };
+
+  const handleStartTimeChange = (nextValue: string) => {
+    const currentDuration = getMinutesDifference(startTimeValue, endTimeValue);
+    setStartTimeValue(nextValue);
+
+    if (!isEndManuallyAdjusted) {
+      setEndTimeValue(addMinutesToLocalValue(nextValue, currentDuration));
+    }
+  };
+
+  const applyDurationPreset = (minutes: number) => {
+    setEndTimeValue(addMinutesToLocalValue(startTimeValue, minutes));
+    setIsEndManuallyAdjusted(false);
+  };
 
   return (
     <form action={formAction} className="space-y-4">
@@ -94,7 +162,7 @@ export function EventForm({ mode, event, onSuccess }: EventFormProps) {
           placeholder="z.B. Meeting mit Anna"
           required
           maxLength={200}
-          defaultValue={event?.title}
+          defaultValue={event?.title ?? initialValues?.title ?? ""}
           disabled={isPending}
           autoFocus
         />
@@ -107,7 +175,7 @@ export function EventForm({ mode, event, onSuccess }: EventFormProps) {
           name="description"
           placeholder="Optional: Details zum Event"
           rows={3}
-          defaultValue={event?.description || ""}
+          defaultValue={event?.description ?? initialValues?.description ?? ""}
           disabled={isPending}
           className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         />
@@ -130,7 +198,8 @@ export function EventForm({ mode, event, onSuccess }: EventFormProps) {
             name="start_time"
             type="datetime-local"
             required
-            defaultValue={defaultStartTime}
+            value={startTimeValue}
+            onChange={(event) => handleStartTimeChange(event.target.value)}
             disabled={isPending}
           />
         </div>
@@ -142,9 +211,32 @@ export function EventForm({ mode, event, onSuccess }: EventFormProps) {
             name="end_time"
             type="datetime-local"
             required
-            defaultValue={defaultEndTime}
+            value={endTimeValue}
+            onChange={(event) => {
+              setEndTimeValue(event.target.value);
+              setIsEndManuallyAdjusted(true);
+            }}
             disabled={isPending}
           />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Schnelle Dauer</Label>
+        <div className="flex flex-wrap gap-2">
+          {DURATION_PRESETS.map((preset) => (
+            <Button
+              key={preset.label}
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => applyDurationPreset(preset.minutes)}
+              disabled={isPending}
+              className="calendar-interactive rounded-full"
+            >
+              {preset.label}
+            </Button>
+          ))}
         </div>
       </div>
 

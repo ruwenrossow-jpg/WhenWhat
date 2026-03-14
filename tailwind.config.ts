@@ -67,6 +67,23 @@ export default {
         'body': ['Manrope', 'sans-serif'],
         'accent': ['Dancing Script', 'cursive'],
       },
+      keyframes: {
+        'nav-indicator-in': {
+          '0%': { transform: 'scaleX(0.6)', opacity: '0.2' },
+          '100%': { transform: 'scaleX(1)', opacity: '1' },
+        },
+        'view-fade-up': {
+          '0%': { opacity: '0', transform: 'translateY(10px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+      animation: {
+        'nav-indicator-in': 'nav-indicator-in 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+        'view-fade-up': 'view-fade-up 240ms cubic-bezier(0.22, 1, 0.36, 1)',
+      },
+      transitionTimingFunction: {
+        wave: 'cubic-bezier(0.22, 1, 0.36, 1)',
+      },
       // �🎨 Custom Brand Tokens
       ...brandExtensions,
     },

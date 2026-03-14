@@ -3,10 +3,21 @@
 import type { Event } from "@/features/events/queries";
 import { calculateEventPosition, formatTime } from "../utils";
 import { Clock } from "lucide-react";
-import { useEffect, useState, useMemo, memo } from "react";
+import { useEffect, useRef, useState, useMemo, memo } from "react";
+import type { MouseEvent } from "react";
 import { useTimelineHeight } from "@/lib/design/hooks";
 import { calendarConstants } from "@/lib/design/constants";
 import { brandTokens } from "@/lib/design/tokens";
+
+const toLocalDateTimeValue = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
 
 // Helper to get event color configuration
 const getEventColor = (colorId: string) => {
@@ -14,18 +25,85 @@ const getEventColor = (colorId: string) => {
 };
 
 type DayTimelineProps = {
+  currentDate: Date;
   events: Event[];
   onEventEdit: (event: Event) => void;
+  onSlotSelect?: (slot: { start_time: string; end_time: string }) => void;
+  hourHeight?: number;
+  autoFocusOnNow?: boolean;
 };
 
-export function DayTimeline({ events, onEventEdit }: DayTimelineProps) {
+export function DayTimeline({
+  currentDate,
+  events,
+  onEventEdit,
+  onSlotSelect,
+  hourHeight: controlledHourHeight,
+  autoFocusOnNow = true,
+}: DayTimelineProps) {
   const hours = useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
-  const hourHeight = useTimelineHeight();
+  const fallbackHourHeight = useTimelineHeight();
+  const hourHeight = controlledHourHeight ?? fallbackHourHeight;
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!autoFocusOnNow || !rootRef.current) {
+      return;
+    }
+
+    const now = new Date();
+    const hoursFromStart = Math.max(
+      0,
+      now.getHours() + now.getMinutes() / 60 - calendarConstants.timeline.focusPaddingHours
+    );
+    const anchorTop = hoursFromStart * hourHeight;
+    const scrollParent = rootRef.current.closest("main");
+
+    if (!scrollParent) {
+      return;
+    }
+
+    const rootTop = rootRef.current.getBoundingClientRect().top;
+    const parentTop = scrollParent.getBoundingClientRect().top;
+    const relativeTop = rootTop - parentTop + scrollParent.scrollTop;
+
+    scrollParent.scrollTo({
+      top: Math.max(0, relativeTop + anchorTop - 96),
+      behavior: "smooth",
+    });
+  }, [autoFocusOnNow, hourHeight]);
+
+  const handleTimelineClick = (event: MouseEvent<HTMLDivElement>) => {
+    if (!onSlotSelect) {
+      return;
+    }
+
+    if ((event.target as HTMLElement).closest("[data-event-card='true']")) {
+      return;
+    }
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const offsetY = Math.max(0, event.clientY - bounds.top);
+    const snappedMinutes = Math.min(
+      23 * 60 + 30,
+      Math.max(0, Math.round((offsetY / hourHeight) * 2) * 30)
+    );
+    const start = new Date(currentDate);
+    start.setHours(0, 0, 0, 0);
+    start.setMinutes(snappedMinutes);
+    const end = new Date(start);
+    end.setMinutes(end.getMinutes() + 60);
+
+    onSlotSelect({
+      start_time: toLocalDateTimeValue(start),
+      end_time: toLocalDateTimeValue(end),
+    });
+  };
 
   return (
-    <div className="relative bg-card rounded-lg border overflow-visible">
+    <div ref={rootRef} className="relative bg-card rounded-lg border overflow-visible calendar-view-transition">
       {/* Timeline Grid */}
-      <div className="relative" style={{ height: `${24 * hourHeight}px` }}>
+      <div className="relative" style={{ height: `${24 * hourHeight}px` }} onClick={handleTimelineClick}>
         {/* Hour markers */}
         {hours.map((hour) => (
           <div
@@ -53,6 +131,7 @@ export function DayTimeline({ events, onEventEdit }: DayTimelineProps) {
               <div
                 key={event.id}
                 className="absolute left-20 right-4"
+                data-event-card="true"
                 style={{ top: `${top}px`, height: `${height}px`, minHeight: calendarConstants.event.minHeight }}
               >
                 <div 

@@ -8,7 +8,13 @@ export const calendarConstants = {
     hourHeightMobile: 50,   // px pro Stunde auf Mobile
     hourCount: 24,          // Anzahl Stunden im Tag
     autoScrollOffset: 2,    // Stunden vor aktueller Zeit beim Auto-Scroll
+    focusPaddingHours: 1.5, // Sichtbarer Kontext oberhalb von "Jetzt"
     timeColumnWidth: '5rem', // 80px
+    zoomLevels: {
+      compact: 42,
+      standard: 56,
+      focus: 76,
+    },
   },
 
   // Week Grid Konfiguration

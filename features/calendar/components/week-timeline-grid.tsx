@@ -5,10 +5,21 @@ import { getWeekDays, formatTime, isSameDayUtil, calculateEventPosition } from "
 import { format, parseISO } from "date-fns";
 import { de } from "date-fns/locale";
 import { Clock } from "lucide-react";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useTimelineHeight } from "@/lib/design/hooks";
 import { calendarConstants } from "@/lib/design/constants";
 import { brandTokens } from "@/lib/design/tokens";
+import type { MouseEvent } from "react";
+
+const toLocalDateTimeValue = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
 
 // Helper to get event color configuration
 const getEventColor = (colorId: string) => {
@@ -19,13 +30,25 @@ type WeekTimelineGridProps = {
   currentDate: Date;
   events: Event[];
   onEventClick: (event: Event) => void;
+  onSlotSelect?: (slot: { start_time: string; end_time: string }) => void;
+  hourHeight?: number;
+  autoFocusOnNow?: boolean;
 };
 
-export function WeekTimelineGrid({ currentDate, events, onEventClick }: WeekTimelineGridProps) {
+export function WeekTimelineGrid({
+  currentDate,
+  events,
+  onEventClick,
+  onSlotSelect,
+  hourHeight: controlledHourHeight,
+  autoFocusOnNow = true,
+}: WeekTimelineGridProps) {
   const weekDays = getWeekDays(currentDate);
   const hours = useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
-  const hourHeight = useTimelineHeight();
+  const fallbackHourHeight = useTimelineHeight();
+  const hourHeight = controlledHourHeight ?? fallbackHourHeight;
   const today = new Date();
+  const rootRef = useRef<HTMLDivElement>(null);
 
   // Group events by day
   const eventsByDay = useMemo(() => {
@@ -36,13 +59,79 @@ export function WeekTimelineGrid({ currentDate, events, onEventClick }: WeekTime
     });
   }, [weekDays, events]);
 
+  const includesToday = useMemo(
+    () => weekDays.some((day) => isSameDayUtil(day, new Date())),
+    [weekDays]
+  );
+
+  useEffect(() => {
+    if (!autoFocusOnNow || !rootRef.current) {
+      return;
+    }
+
+    if (!includesToday) {
+      return;
+    }
+
+    const now = new Date();
+    const hoursFromStart = Math.max(
+      0,
+      now.getHours() + now.getMinutes() / 60 - calendarConstants.timeline.focusPaddingHours
+    );
+    const anchorTop = hoursFromStart * hourHeight;
+    const scrollParent = rootRef.current.closest("main");
+
+    if (!scrollParent) {
+      return;
+    }
+
+    const rootTop = rootRef.current.getBoundingClientRect().top;
+    const parentTop = scrollParent.getBoundingClientRect().top;
+    const relativeTop = rootTop - parentTop + scrollParent.scrollTop;
+
+    scrollParent.scrollTo({
+      top: Math.max(0, relativeTop + anchorTop - 96),
+      behavior: "smooth",
+    });
+  }, [autoFocusOnNow, hourHeight, includesToday]);
+
+  const handleDaySlotClick = (day: Date, event: MouseEvent<HTMLDivElement>) => {
+    if (!onSlotSelect) {
+      return;
+    }
+
+    if ((event.target as HTMLElement).closest("[data-event-card='true']")) {
+      return;
+    }
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const offsetY = Math.max(0, event.clientY - bounds.top);
+    const snappedMinutes = Math.min(
+      23 * 60 + 30,
+      Math.max(0, Math.round((offsetY / hourHeight) * 2) * 30)
+    );
+    const start = new Date(day);
+    start.setHours(0, 0, 0, 0);
+    start.setMinutes(snappedMinutes);
+    const end = new Date(start);
+    end.setMinutes(end.getMinutes() + 60);
+
+    onSlotSelect({
+      start_time: toLocalDateTimeValue(start),
+      end_time: toLocalDateTimeValue(end),
+    });
+  };
+
   return (
-    <div className="bg-card rounded-lg border overflow-x-auto overflow-y-visible">
+    <div ref={rootRef} className="bg-card rounded-lg border overflow-x-auto overflow-y-visible calendar-view-transition">
       <div className="flex" style={{ minWidth: calendarConstants.weekGrid.minWidth.timeline }}>
         {/* Time column - sticky */}
         <div className="sticky left-0 bg-card z-20 border-r flex-shrink-0" style={{ width: calendarConstants.timeline.timeColumnWidth }}>
           {/* Header spacer */}
-          <div className="border-b-2 border-border" style={{ height: calendarConstants.weekGrid.headerHeight }} />
+          <div
+            className="sticky top-0 z-30 border-b-2 border-border bg-card/95 backdrop-blur-md"
+            style={{ height: calendarConstants.weekGrid.headerHeight }}
+          />
           
           {/* Hour labels */}
           <div className="relative" style={{ height: `${24 * hourHeight}px` }}>
@@ -75,16 +164,16 @@ export function WeekTimelineGrid({ currentDate, events, onEventClick }: WeekTime
               >
                 {/* Day header */}
                 <div
-                  className={`p-3 border-b-2 text-center transition-colors ${
+                  className={`sticky top-0 z-20 p-2 border-b text-center backdrop-blur-sm transition-colors ${
                     isToday ? "border-b-primary bg-primary/10" : "border-b-border"
                   }`}
                   style={{ height: calendarConstants.weekGrid.headerHeight }}
                 >
-                  <div className="text-xs text-muted-foreground uppercase font-medium">
+                  <div className="text-[10px] text-muted-foreground uppercase font-medium tracking-wide">
                     {format(day, "EEE", { locale: de })}
                   </div>
                   <div
-                    className={`text-xl font-bold mt-1 ${
+                    className={`text-base font-bold mt-1 ${
                       isToday ? "text-primary" : ""
                     }`}
                   >
@@ -93,7 +182,11 @@ export function WeekTimelineGrid({ currentDate, events, onEventClick }: WeekTime
                 </div>
 
                 {/* Timeline grid for this day */}
-                <div className="relative" style={{ height: `${24 * hourHeight}px` }}>
+                <div
+                  className="relative calendar-interactive"
+                  style={{ height: `${24 * hourHeight}px` }}
+                  onClick={(event) => handleDaySlotClick(day, event)}
+                >
                   {/* Hour grid lines */}
                   {hours.map((hour) => (
                     <div
@@ -117,6 +210,7 @@ export function WeekTimelineGrid({ currentDate, events, onEventClick }: WeekTime
                         <div
                           key={event.id}
                           className="absolute left-1 right-1"
+                          data-event-card="true"
                           style={{ 
                             top: `${top}px`, 
                             height: `${Math.max(height, 30)}px`,

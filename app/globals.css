@@ -107,6 +107,47 @@ body {
     text-wrap: balance;
   }
 
+  .calendar-view-transition {
+    animation: view-fade-up var(--transition-slow) cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .calendar-interactive {
+    transition:
+      background-color var(--transition-fast) cubic-bezier(0.22, 1, 0.36, 1),
+      color var(--transition-fast) cubic-bezier(0.22, 1, 0.36, 1),
+      transform var(--transition-fast) cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow var(--transition-base) cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .calendar-interactive:active {
+    transform: scale(0.98);
+  }
+
+  .calendar-nav-indicator {
+    animation: nav-indicator-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .calendar-skeleton {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(
+      100deg,
+      hsl(var(--muted)) 15%,
+      hsl(var(--muted) / 0.55) 40%,
+      hsl(var(--muted)) 65%
+    );
+    background-size: 220% 100%;
+    animation: calendar-skeleton-wave 1.25s ease-in-out infinite;
+  }
+
+  .week-context-enter {
+    animation: week-context-in 360ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .week-chip-enter {
+    animation: week-chip-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
   .safe-px {
     padding-left: max(1rem, env(safe-area-inset-left));
     padding-right: max(1rem, env(safe-area-inset-right));
@@ -140,6 +181,49 @@ body {
   
   .current-time-text {
     color: rgb(var(--color-current-time));
+  }
+}
+
+@keyframes calendar-skeleton-wave {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@keyframes week-context-in {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes week-chip-in {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .calendar-view-transition,
+  .calendar-nav-indicator,
+  .calendar-interactive,
+  .calendar-skeleton,
+  .week-context-enter,
+  .week-chip-enter {
+    animation: none !important;
+    transition-duration: 0ms !important;
   }
 }
 

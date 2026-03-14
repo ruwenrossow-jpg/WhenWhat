@@ -8,7 +8,14 @@ import { FloatingActionButton } from "@/features/events/components/floating-acti
 import { DateNavigation } from "@/features/calendar/components/date-navigation";
 import { MonthGrid } from "@/features/calendar/components/month-grid";
 import { DayDetailSheet } from "@/features/calendar/components/day-detail-sheet";
+import { MonthGridSkeleton } from "@/features/calendar/components/loading-skeletons";
 import type { Event } from "@/features/events/queries";
+import {
+  fetchEventsFromApi,
+  getCachedEvents,
+  invalidateCachedEvents,
+  prefetchEvents,
+} from "@/features/events/client-cache";
 import {
   getToday,
   getPreviousMonth,
@@ -31,11 +38,15 @@ export default function MonthViewPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [createDraft, setCreateDraft] = useState<{ start_time?: string; end_time?: string } | undefined>();
   const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | undefined>();
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const refreshEvents = () => setRefreshKey((prev) => prev + 1);
+  const refreshEvents = () => {
+    invalidateCachedEvents("month", formatDateForURL(currentDate));
+    setRefreshKey((prev) => prev + 1);
+  };
 
   useEffect(() => {
     const dateStr = formatDateForURL(currentDate);
@@ -44,30 +55,49 @@ export default function MonthViewPage() {
 
   useEffect(() => {
     const abortController = new AbortController();
+    const dateString = formatDateForURL(currentDate);
+    const cachedEvents = getCachedEvents("month", dateString);
 
     const fetchEvents = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const response = await fetch(
-          `/api/events/month?date=${formatDateForURL(currentDate)}`,
-          { signal: abortController.signal }
-        );
+      if (cachedEvents) {
+        setEvents(cachedEvents);
+        setIsLoading(false);
+      } else {
+        setIsLoading(true);
+      }
 
-        if (response.status === 401 || response.status === 403) {
+      setError(null);
+
+      try {
+        const result = await fetchEventsFromApi("month", dateString, {
+          signal: abortController.signal,
+        });
+
+        if (result.kind === "auth") {
           router.push("/login");
           return;
         }
 
-        if (response.ok) {
-          const data = await response.json();
-          setEvents(data);
-        } else {
+        if (result.kind === "success") {
+          setEvents(result.events);
+
+          const previousMonth = formatDateForURL(getPreviousMonth(currentDate));
+          const nextMonth = formatDateForURL(getNextMonth(currentDate));
+          setTimeout(() => {
+            void prefetchEvents("month", previousMonth);
+            void prefetchEvents("month", nextMonth);
+          }, 0);
+          return;
+        }
+
+        if (!cachedEvents) {
           setError("Events konnten nicht geladen werden");
         }
       } catch (fetchError: unknown) {
         if (fetchError instanceof Error && fetchError.name !== "AbortError") {
-          setError("Fehler beim Laden der Events. Bitte erneut versuchen.");
+          if (!cachedEvents) {
+            setError("Fehler beim Laden der Events. Bitte erneut versuchen.");
+          }
         }
       } finally {
         if (!abortController.signal.aborted) {
@@ -89,9 +119,32 @@ export default function MonthViewPage() {
     setIsDetailSheetOpen(true);
   };
 
+  const toLocalDateTimeValue = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const openCreateFromSelectedDay = () => {
+    const start = new Date(selectedDate);
+    start.setHours(9, 0, 0, 0);
+    const end = new Date(selectedDate);
+    end.setHours(10, 0, 0, 0);
+
+    setCreateDraft({
+      start_time: toLocalDateTimeValue(start),
+      end_time: toLocalDateTimeValue(end),
+    });
+    setIsCreateDialogOpen(true);
+  };
+
   return (
     <>
-      <div className="space-y-4">
+      <div className="space-y-4 calendar-view-transition">
         <DateNavigation
           currentDate={currentDate}
           onDateChange={setCurrentDate}
@@ -101,9 +154,7 @@ export default function MonthViewPage() {
         />
 
         {isLoading ? (
-          <div className="bg-card rounded-lg border p-8 text-center">
-            <p className="text-muted-foreground">Lade Events...</p>
-          </div>
+          <MonthGridSkeleton />
         ) : error ? (
           <div className="bg-destructive/10 border border-destructive rounded-lg p-6 text-sm text-destructive">
             {error}
@@ -129,7 +180,20 @@ export default function MonthViewPage() {
         )}
       </div>
 
-      <FloatingActionButton onClick={() => setIsCreateDialogOpen(true)} />
+      <FloatingActionButton
+        onClick={() => {
+          setCreateDraft(undefined);
+          setIsCreateDialogOpen(true);
+        }}
+      />
+
+      <button
+        type="button"
+        onClick={openCreateFromSelectedDay}
+        className="fixed bottom-28 right-6 z-30 rounded-full border border-border bg-background/90 px-4 py-2 text-sm font-semibold shadow-sm backdrop-blur-md calendar-interactive"
+      >
+        Event am {formatDateForURL(selectedDate)}
+      </button>
 
       <DayDetailSheet
         open={isDetailSheetOpen}
@@ -141,9 +205,15 @@ export default function MonthViewPage() {
 
       <EventDialog
         open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
+        onOpenChange={(open) => {
+          setIsCreateDialogOpen(open);
+          if (!open) {
+            setCreateDraft(undefined);
+          }
+        }}
         onSuccess={refreshEvents}
         mode="create"
+        initialValues={createDraft}
       />
 
       <EventDialog

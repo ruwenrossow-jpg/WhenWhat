@@ -16,6 +16,12 @@ type EventDialogProps = {
   mode: "create" | "edit";
   event?: Event;
   onSuccess?: () => void;
+  initialValues?: {
+    title?: string;
+    description?: string;
+    start_time?: string;
+    end_time?: string;
+  };
 };
 
 export function EventDialog({
@@ -24,6 +30,7 @@ export function EventDialog({
   mode,
   event,
   onSuccess,
+  initialValues,
 }: EventDialogProps) {
   const handleSuccess = () => {
     onOpenChange(false);
@@ -42,11 +49,18 @@ export function EventDialog({
           </DialogTitle>
           <DialogDescription>
             {mode === "create"
-              ? "Füge ein neues Event zu deinem Kalender hinzu."
+              ? initialValues?.start_time
+                ? "Die Zeit wurde aus deinem gewählten Kalender-Slot übernommen."
+                : "Füge ein neues Event zu deinem Kalender hinzu."
               : "Bearbeite die Details deines Events."}
           </DialogDescription>
         </DialogHeader>
-        <EventForm mode={mode} event={event} onSuccess={handleSuccess} />
+        <EventForm
+          mode={mode}
+          event={event}
+          onSuccess={handleSuccess}
+          initialValues={initialValues}
+        />
       </DialogContent>
     </Dialog>
   );
